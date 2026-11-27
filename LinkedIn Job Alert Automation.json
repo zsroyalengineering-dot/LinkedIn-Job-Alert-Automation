@@ -1,0 +1,472 @@
+{
+  "name": "LinkedIn Job Alert Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        304,
+        0
+      ],
+      "id": "XXXXXXXXXXXXXXXXXXXXXX",
+      "name": "Wait",
+      "webhookId": "XXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a job market analysis assistant.\n\nAnalyze the provided LinkedIn job search data and generate a concise 2–3 sentence summary.\n\nYour summary MUST highlight:\n1. The most common hiring companies.\n2. The most common job locations.\n3. Any noticeable hiring trends, such as remote work, frequently requested roles, or concentration of jobs in certain locations.\n\nDo not invent information.\nUse only the provided data.\n\nJob Data:\n{{ JSON.stringify($json) }}\n\nReturn only the 2–3 sentence summary.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1008,
+        0
+      ],
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        192
+      ],
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "path": "Build a LinkedIn Job Alert Automation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "Webhook-Trigger",
+      "webhookId": "735640aa-7e70-4943-8f19-6e264a479d88"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Job Search Data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": xxxxxxxxxxxxxxxxxxxxx,
+          "mode": "list",
+          "cachedResultName": "Summary to Sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.Date }}",
+            " Total Jobs": "={{ $json['Total Jobs'] }}",
+            " Top Hiring Companies": "={{ $json['Top Hiring Companies'] }}",
+            " Top Locations": "={{ $json['Top Locations'] }}",
+            " AI Summary": "={{ $json['AI Summary'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " Total Jobs",
+              "displayName": " Total Jobs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " Top Hiring Companies",
+              "displayName": " Top Hiring Companies",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " Top Locations",
+              "displayName": " Top Locations",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " AI Summary",
+              "displayName": " AI Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1472,
+        0
+      ],
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "Summary Sheet"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Make Summary data').first().json;\n\nreturn [\n  {\n    json: {\n      \"Date\": new Date().toISOString().split('T')[0],\n      \"Total Jobs\": data.totalJobs,\n      \"Top Hiring Companies\": data.companies\n        .map(c => `${c[0]} (${c[1]})`)\n        .join(\", \"),\n      \"Top Locations\": data.locations\n        .map(l => `${l[0]} (${l[1]})`)\n        .join(\", \"),\n      \"AI Summary\": $json.output || $json.text || \"\"\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        0
+      ],
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "Final summary format"
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = $input.all().map(item => item.json);\n\nconst companies = {};\nconst locations = {};\n\nfor (const job of jobs) {\n  const company = job[\"Company Name\"]?.trim();\n  const location = job[\"Location\"]?.trim();\n\n  if (company) {\n    companies[company] = (companies[company] || 0) + 1;\n  }\n\n  if (location) {\n    locations[location] = (locations[location] || 0) + 1;\n  }\n}\n\nconst topCompanies = Object.entries(companies)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 5);\n\nconst topLocations = Object.entries(locations)\n  .sort((a, b) => b[1] - a[1])\n  .slice(0, 5);\n\nreturn [{\n  json: {\n    totalJobs: jobs.length,\n    companies: topCompanies,\n    locations: topLocations,\n    jobs\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        0
+      ],
+      "id": "760a4fa2-f2bd-45df-80e0-038f5d6ac4d9",
+      "name": "Make Summary data"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Job Search Data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Process the returned data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1W7On1W58ymk1irJJrcEQ7qWNyJbD7ys5sNIxi7Dgpiw/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Job Title": "={{ $json['Job Title'] }}",
+            "Company Name": "={{ $json['Company Name'] }}",
+            "Location": "={{ $json.Location }}",
+            "Posted Time": "={{ $json['Posted Time'] }}",
+            "Job URL": "={{ $json['Job URL'] }}",
+            "Company URL": "={{ $json['Company URL'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Posted Time",
+              "displayName": "Posted Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Job URL",
+              "displayName": "Job URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Company URL",
+              "displayName": "Company URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        656,
+        256
+      ],
+      "id": "81d6ae39-cf39-46e5-904b-fe1296648404",
+      "name": "Make Jobs save_Sheet",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const data = item.json;\n\n  output.push({\n    json: {\n      \"Job Title\": data.jobTitle || data.title || \"\",\n      \"Company Name\": data.companyName || data.company || \"\",\n      \"Location\": data.location || \"\",\n      \"Posted Time\": data.postedTime || data.postedAt || data.datePosted || \"\",\n      \"Job URL\": data.jobUrl || data.url || data.link || \"\",\n      \"Company URL\": data.companyUrl || data.companyWebsite || \"\"\n    }\n  });\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "3d0e2db7-8077-44e9-8c44-eb539af58b23",
+      "name": "Data_Process_Job fields standardize"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/actors/crawlworks~linkedin-jobs-scraper/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n    \"associate\": true,\n    \"contract\": false,\n    \"director\": false,\n    \"easyApply\": true,\n    \"enrichCompanyDetails\": true,\n    \"entryLevel\": true,\n    \"executive\": true,\n    \"fullTime\": true,\n    \"hybrid\": false,\n    \"internship\": false,\n    \"internshipLevel\": true,\n    \"jobsToFetch\": 20,\n    \"location\": \"Bangladesh\",\n    \"midSeniorLevel\": false,\n    \"onSite\": false,\n    \"partTime\": false,\n    \"query\": \"Python Developer\",\n    \"remote\": true,\n    \"temporary\": false,\n    \"under10Applicants\": false,\n    \"volunteer\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        160,
+        0
+      ],
+      "id": "135b7a42-f669-4f8a-a31a-a8ff82e9b97f",
+      "name": "HTTP_POST_Apify scraper"
+    },
+    {
+      "parameters": {
+        "url": "https://api.apify.com/v2/actors/crawlworks~linkedin-jobs-scraper/runs/last/dataset/items?token=apify_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "a69dc482-d0f3-44d5-b574-1861bdc27c66",
+      "name": "HTTP_Get"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1632,
+        0
+      ],
+      "id": "0addd7dc-d38a-4553-be60-6ee04c27043f",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP_Get",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Final summary format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook-Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP_POST_Apify scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final summary format": {
+      "main": [
+        [
+          {
+            "node": "Summary Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Summary data": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data_Process_Job fields standardize": {
+      "main": [
+        [
+          {
+            "node": "Make Jobs save_Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Make Summary data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP_POST_Apify scraper": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP_Get": {
+      "main": [
+        [
+          {
+            "node": "Data_Process_Job fields standardize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary Sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "41fb658e-e5e3-4c6f-bce6-24f020fe4e74",
+  "meta": {
+    "instanceId": "8a7ce5fe68e27d4d273361afd1c34ea9b2eac037c8e11917e004996754a93241"
+  },
+  "nodeGroups": [],
+  "id": "2vCB5XCiLe8BLLwi",
+  "tags": []
+}
